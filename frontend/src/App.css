@@ -1,5 +1,7 @@
+/* Reverted CSS - Before Slider Styles */
 .App {
   text-align: center;
+  padding: 20px;
 }
 
 .App-logo {
@@ -14,14 +16,17 @@
 }
 
 .App-header {
-  background-color: #282c34;
+  background-color: #121212;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  /* justify-content: flex-start; */ /* Let content flow naturally */
+  font-size: calc(10px + 1vmin);
   color: white;
+  padding: 20px;
+  padding-top: 80px; /* Add padding top to account for absolute positioned buttons */
+  position: relative; /* Needed for absolute positioning of children */
 }
 
 .App-link {
@@ -35,4 +40,266 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+h1 {
+  color: #1db954;
+  margin-bottom: 20px;
+}
+
+h2 {
+  margin-top: 10px;
+  color: #eee; /* Lighter color for subtitles */
+}
+h3 {
+   color: #ddd; /* Lighter color for subtitles */
+}
+
+
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  margin-top: 20px;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.playlist-card {
+  background: #282828;
+  border-radius: 10px;
+  padding: 15px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.3s;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: flex; /* Align items vertically */
+  flex-direction: column; /* Stack image and text */
+  align-items: center; /* Center content */
+  height: 100%; /* Make cards fill grid cell height */
+}
+
+.playlist-card:hover {
+  transform: scale(1.03); /* Slightly less aggressive hover */
+  background: #3a3a3a;
+}
+
+.playlist-card h3 {
+    margin-top: 10px; /* Space between image and title */
+    font-size: 1em; /* Adjust title size */
+    text-align: center; /* Center title */
+    word-break: break-word; /* Prevent long names from overflowing */
+    color: #fff; /* Ensure title is white */
+}
+
+
+.playlist-image {
+  width: 100%;
+  max-width: 180px; /* Limit image size */
+  height: 180px;
+  object-fit: cover;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.playlist-image-placeholder {
+  width: 100%;
+  max-width: 180px; /* Limit placeholder size */
+  height: 180px;
+  background: #333;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-size: 0.9em;
+}
+
+input[type="text"] {
+  padding: 12px 20px;
+  width: 80%; /* Relative width */
+  max-width: 400px; /* Max width */
+  border-radius: 30px;
+  border: none;
+  margin: 20px 0;
+  background: #333;
+  color: white;
+  font-size: 16px;
+}
+
+input[type="text"]::placeholder {
+  color: #aaa;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #1db954; /* Add focus indicator */
+}
+
+button {
+  background: #1db954;
+  color: white;
+  border: none;
+  padding: 10px 25px; /* Slightly smaller padding */
+  border-radius: 30px;
+  cursor: pointer;
+  margin: 5px; /* Reduced margin */
+  font-weight: bold;
+  font-size: 15px; /* Slightly smaller font */
+  transition: background 0.2s, transform 0.1s; /* Faster transitions */
+}
+
+button:hover {
+  background: #1ed760;
+  transform: scale(1.02); /* Subtle hover scale */
+}
+button:active {
+    transform: scale(0.98); /* Click feedback */
+}
+
+
+/* Track Details List */
+.track-detail-list {
+  margin-top: 30px; /* More space above list */
+  text-align: left;
+  padding: 20px;
+  background: #1e1e1e; /* Slightly darker background */
+  border-radius: 10px;
+  max-width: 800px;
+  width: 95%; /* Use more width */
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); /* Inner shadow */
+}
+
+.track-detail-list h3 {
+  color: #1db954;
+  margin-bottom: 15px;
+  text-align: center; /* Center heading */
+  font-size: 1.3em;
+}
+
+.track-detail-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+/* Song Item Styling */
+.song-item {
+  display: flex;
+  flex-direction: column; /* Stack info and data */
+  gap: 10px; /* Increased gap */
+  padding: 15px;
+  background: #282828; /* Match other card backgrounds */
+  border-radius: 8px; /* Consistent border radius */
+  margin: 12px 0; /* More spacing between items */
+  transition: background 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.song-item:hover {
+  background: #3a3a3a;
+}
+
+.song-info {
+  font-size: 1.1em;
+  color: #fff;
+}
+.song-info strong {
+  font-weight: bold; /* Ensure strong tag is bold */
+  color: #eee; /* Slightly brighter for emphasis */
+}
+
+.song-data {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, auto)); /* Adjust min width */
+  gap: 8px 12px; /* Row and column gap */
+  color: #b3b3b3; /* Lighter grey for data */
+  font-size: 0.9em;
+}
+
+.song-data span {
+  background: #444;
+  padding: 6px 10px; /* Adjusted padding */
+  border-radius: 5px; /* Softer radius */
+  white-space: nowrap; /* Prevent wrapping */
+  text-align: center; /* Center text in spans */
+  font-size: 0.95em; /* Slightly larger data font */
+}
+
+/* Playlist Metrics Section */
+.playlist-metrics {
+  margin: 30px 0; /* More margin */
+  padding: 25px; /* More padding */
+  background: #1e1e1e; /* Match track list background */
+  border-radius: 10px;
+  width: 100%;
+  max-width: 800px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.playlist-metrics h3 {
+  color: #1db954;
+  margin-bottom: 25px; /* More space below heading */
+  text-align: center; /* Center heading */
+   font-size: 1.4em;
+}
+
+.metrics-grid {
+  display: grid;
+  /* Fixed 3 columns for better stability */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.metric-card {
+  background: #282828; /* Match other card backgrounds */
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.metric-card:hover {
+  transform: translateY(-4px); /* Subtle lift */
+  box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+}
+
+.metric-card h4 {
+  color: #ccc; /* Lighter heading color */
+  margin-bottom: 12px;
+  font-size: 1em; /* Slightly smaller heading */
+  font-weight: 500; /* Less bold */
+}
+
+.metric-value {
+  font-size: 1.8em; /* Slightly smaller value */
+  font-weight: bold;
+  color: #1db954;
+  line-height: 1.2; /* Ensure numbers fit */
+}
+
+.metric-value .loading,
+.metric-value .no-data {
+  color: #888; /* Consistent color for placeholder text */
+  font-size: 0.7em; /* Smaller text */
+  font-style: italic;
+}
+
+
+/* Error Message Style */
+.error-message {
+  color: #ff6b6b; /* Brighter red */
+  background-color: rgba(255, 107, 107, 0.1); /* Subtle background */
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  padding: 12px 18px;
+  border-radius: 8px;
+  margin: 15px auto; /* Center horizontally */
+  max-width: 800px;
+  width: 90%;
+  text-align: center;
+  font-size: 0.95em;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
