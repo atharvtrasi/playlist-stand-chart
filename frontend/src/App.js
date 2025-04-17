@@ -1,6 +1,28 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { Radar } from 'react-chartjs-2'; // Import Radar chart
+import {
+    Chart as ChartJS,
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+} from 'chart.js'; // Import necessary components for Radar chart
 import "./App.css"; // Make sure to import the CSS file
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+// Register Chart.js components
+ChartJS.register(
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend
+);
 
 // Helper function to format duration (takes milliseconds)
 const formatDuration = (milliseconds) => {
@@ -24,6 +46,59 @@ const formatDuration = (milliseconds) => {
     }
 };
 
+// Chart configuration constants
+const chartLabels = ['Power', 'Speed', 'Precision', 'Potential', 'Durability', 'Range']; // Corresponds to JoJo stats
+const chartOptions = {
+    scales: {
+        r: {
+            angleLines: {
+                display: true,
+                color: 'rgba(255, 255, 255, 0.3)'
+            },
+            grid: {
+                color: 'rgba(255, 255, 255, 0.3)'
+            },
+            pointLabels: {
+                color: '#fff',
+                font: {
+                    size: 12 // Adjust as needed
+                }
+            },
+            suggestedMin: 0,
+            suggestedMax: 100, // Assuming jojo.py normalizes to 0-100 (adjust if different)
+            ticks: {
+                backdropColor: 'rgba(0, 0, 0, 0.5)', // Background for ticks
+                color: '#ccc', // Tick label color
+                stepSize: 20 // Adjust step size as needed
+            }
+        }
+    },
+    plugins: {
+        legend: {
+            position: 'top',
+            labels: {
+                color: '#fff' // Legend text color
+            }
+        },
+        tooltip: {
+            callbacks: {
+                label: function (context) {
+                    let label = context.dataset.label || '';
+                    if (label) {
+                        label += ': ';
+                    }
+                    if (context.parsed.r !== null) {
+                        // Format to 2 decimal places for tooltip
+                        label += context.parsed.r.toFixed(2);
+                    }
+                    return label;
+                }
+            }
+        }
+    },
+    maintainAspectRatio: false // Allow chart to resize within container
+};
+
 
 function App() {
     const [token, setToken] = useState("");
@@ -32,9 +107,9 @@ function App() {
     const [filteredPlaylists, setFilteredPlaylists] = useState([]);
     const [trackDetails, setTrackDetails] = useState([]);
     const [selectedPlaylist, setSelectedPlaylist] = useState(null);
-    const [loadingData, setLoadingData] = useState(false);
+    const [loadingData, setLoadingData] = useState(false); // General loading for playlist/track data
     const [error, setError] = useState(null);
-    const [view, setView] = useState('playlists');
+    const [view, setView] = useState('playlists'); // 'playlists', 'slider', 'metrics', 'chart'
     const [sliderValue, setSliderValue] = useState(3);
     const [playlistMetrics, setPlaylistMetrics] = useState({
         averageBPM: null,
@@ -44,16 +119,20 @@ function App() {
         averageRelaxedProbability: null,
         potential: null,
     });
+    const [chartData, setChartData] = useState(null); // State for chart data from backend
+    const [loadingChart, setLoadingChart] = useState(false); // Specific loading for chart generation
+    const [chartError, setChartError] = useState(null); // Specific error for chart generation
 
     // --- CONSOLE LOG TO SEE STATE ON RENDER ---
     // console.log("--- App Component Render ---");
-    // console.log("Token:", token ? `${token.substring(0, 5)}...` : "None");
     // console.log("View:", view);
     // console.log("Loading Data:", loadingData);
+    // console.log("Loading Chart:", loadingChart);
     // console.log("Selected Playlist:", selectedPlaylist?.name || "None");
     // console.log("Playlist Metrics:", playlistMetrics);
-    // console.log("Track Details Count:", trackDetails.length);
+    // console.log("Chart Data:", chartData);
     // console.log("Error State:", error);
+    // console.log("Chart Error State:", chartError);
     // console.log("----------------------------");
 
 
@@ -93,12 +172,15 @@ function App() {
         setTrackDetails([]);
         setPlaylistMetrics({ averageBPM: null, averageDanceability: null, uniqueGenreCount: null, spotifyTotalDurationMs: null, averageRelaxedProbability: null, potential: null });
         setError(null);
+        setChartError(null); // Reset chart error on logout
+        setChartData(null); // Reset chart data on logout
         setView('playlists');
         setSliderValue(3);
-        setLoadingData(false); // Ensure loading stops
-        window.history.replaceState({}, document.title, "/"); // Clean URL
+        setLoadingData(false);
+        setLoadingChart(false); // Reset chart loading
+        window.history.replaceState({}, document.title, "/");
         console.log("Logout Handler: State reset complete.");
-    }, []); // No dependencies needed
+    }, []);
 
     // Effect to fetch playlists when token changes
     const fetchPlaylists = useCallback(async () => {
@@ -109,7 +191,7 @@ function App() {
         console.log("Fetch Playlists: Starting fetch...");
         // setError(null); // Clear previous errors when starting a new fetch
         try {
-            const response = await axios.get("http://localhost:5000/get_playlists", {
+            const response = await axios.get(`${API_BASE_URL}/get_playlists`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             console.log(`Fetch Playlists: Success, received ${response.data.length} playlists.`);
@@ -127,7 +209,7 @@ function App() {
             setPlaylists([]);
             setFilteredPlaylists([]);
         }
-    }, [token, handleLogout]); // Depends on token and handleLogout
+    }, [token, handleLogout]);
 
     useEffect(() => {
         fetchPlaylists();
@@ -145,7 +227,7 @@ function App() {
     // --- API Call Functions ---
     const handleLogin = () => {
         console.log("Login Handler: Redirecting to backend for Spotify login...");
-        window.location.href = "http://localhost:5000/"; // Redirect to backend login route
+        window.location.href = `${API_BASE_URL}/`; // Redirect to backend login route
     };
 
     // Fetch MBID from backend
@@ -156,7 +238,7 @@ function App() {
             return null;
         }
         try {
-            const response = await axios.get(`http://localhost:5000/get_mbid`, {
+            const response = await axios.get(`${API_BASE_URL}/get_mbid`, {
                 params: { song_name: songname, artist_name: artist, album: album }
             });
             console.log(`Fetch MBID: Success for '${songname}'. MBID: ${response.data.mbid}`);
@@ -181,7 +263,7 @@ function App() {
         }
         console.log(`Fetch Acoustic Data: Requesting for MBID ${mbid}`);
         try {
-            const response = await axios.get(`http://localhost:5000/get_acoustic_data`, {
+            const response = await axios.get(`${API_BASE_URL}/get_acoustic_data`, {
                 params: { mbid: mbid }
             });
             const data = response.data;
@@ -307,6 +389,7 @@ function App() {
             setTrackDetails(allTrackDetails); // Update state with successfully processed details
             calculatePlaylistMetrics(allTrackDetails); // Calculate metrics based on the processed details
 
+            console.log("\n\nTRACK METRICS: ", allTrackDetails);
         } catch (err) {
             // This catch block might not be strictly necessary with allSettled,
             // but good for catching unexpected errors in the overall process.
@@ -316,7 +399,7 @@ function App() {
             calculatePlaylistMetrics([]); // Recalculate metrics with empty data
         } finally {
             console.log("Process Track Data: Setting loadingData to false.");
-            setLoadingData(false); // Stop loading indicator *after* all processing is done or failed
+            setLoadingData(false); // Stop general loading indicator *after* all processing is done or failed
         }
     }, [calculatePlaylistMetrics]); // Depends on calculatePlaylistMetrics
 
@@ -330,8 +413,11 @@ function App() {
         // Reset all metrics before moving to slider
         setPlaylistMetrics({ averageBPM: null, averageDanceability: null, uniqueGenreCount: null, spotifyTotalDurationMs: null, averageRelaxedProbability: null, potential: null });
         setError(null); // Clear previous errors
+        setChartError(null); // Reset chart error
+        setChartData(null); // Reset chart data
         setSliderValue(3); // Reset slider
         setLoadingData(false); // Ensure loading is off
+        setLoadingChart(false); // Reset chart loading
         setView('slider'); // Move to slider view
         console.log("Playlist Click: State reset and view changed to 'slider'.");
     }, []); // No dependencies needed
@@ -348,12 +434,14 @@ function App() {
         // Store potential and move view *before* async calls
         setPlaylistMetrics(prev => ({ ...prev, potential: sliderValue }));
         setView('metrics');
-        setLoadingData(true); // Start loading indicator
+        setLoadingData(true); // Start general loading indicator
         setError(null); // Clear previous errors
+        setChartError(null); // Clear previous chart errors
+        setChartData(null); // Clear previous chart data
 
         try {
             console.log("Slider Next: Fetching Spotify playlist details...");
-            const response = await axios.get(`http://localhost:5000/search_playlist`, {
+            const response = await axios.get(`${API_BASE_URL}/search_playlist`, {
                 params: { q: selectedPlaylist.name }, // Pass name as query param
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -385,7 +473,6 @@ function App() {
                 calculatePlaylistMetrics([]); // Calculate metrics with empty data (resets AB metrics)
                 setLoadingData(false); // Stop loading as there's nothing more to do
             }
-
         } catch (error) {
             console.error("Slider Next: Error fetching or processing playlist details:", error.response?.data || error.message, error);
             if (error.response && error.response.status === 401) {
@@ -415,44 +502,165 @@ function App() {
         setTrackDetails([]);
         setPlaylistMetrics({ averageBPM: null, averageDanceability: null, uniqueGenreCount: null, spotifyTotalDurationMs: null, averageRelaxedProbability: null, potential: null });
         setError(null);
+        setChartError(null); // Reset chart error
+        setChartData(null); // Reset chart data
         setView('playlists');
         setSliderValue(3);
-        setLoadingData(false); // Ensure loading is off
+        setLoadingData(false);
+        setLoadingChart(false); // Reset chart loading
     };
+
+    // Function to go back to the metrics view from chart view
+    const goBackToMetrics = () => {
+        console.log("Go Back: Returning to metrics view.");
+        setView('metrics');
+        setChartError(null); // Optionally clear chart error when going back
+        // Keep chartData so it doesn't have to reload if they click Generate again
+        setLoadingChart(false); // Ensure chart loading is off
+    };
+
+    // --- NEW: Function to handle "Generate Chart" button click ---
+    const goToChartPage = async () => {
+        console.log("Generate Chart: Button clicked.");
+        setLoadingChart(true); // Start chart loading
+        setChartError(null); // Clear previous chart errors
+        setChartData(null); // Clear previous chart data
+
+        // Check if all required metrics are available
+        const requiredMetrics = [
+            'averageBPM', 'averageDanceability', 'uniqueGenreCount',
+            'spotifyTotalDurationMs', 'averageRelaxedProbability', 'potential'
+        ];
+        const missingMetrics = requiredMetrics.filter(key => playlistMetrics[key] === null || playlistMetrics[key] === undefined);
+
+        if (missingMetrics.length > 0) {
+            const errorMsg = `Cannot generate chart. Missing metrics: ${missingMetrics.join(', ')}.`;
+            console.error("Generate Chart:", errorMsg);
+            setChartError(errorMsg);
+            setLoadingChart(false);
+            return;
+        }
+
+        console.log("Generate Chart: All required metrics present:", playlistMetrics);
+
+        try {
+            console.log("Generate Chart: Calling backend /get_chart endpoint...");
+            const response = await axios.get(`${API_BASE_URL}/get_chart`, {
+                params: {
+                    data: JSON.stringify(playlistMetrics) // Send metrics as a JSON string
+                }
+                // No Auth header needed if endpoint doesn't require it, but add if necessary
+                // headers: { Authorization: `Bearer ${token}` }
+            });
+
+            console.log("Generate Chart: Received chart data from backend:", response.data);
+            setChartData(response.data); // Store the received chart data
+            setView('chart'); // Change view to display charts
+
+        } catch (err) {
+            const errorMsg = err.response?.data?.error || err.message || "An unknown error occurred";
+            console.error("Generate Chart: Error fetching or processing chart data:", errorMsg, err);
+            setChartError(`Failed to generate chart: ${errorMsg}`);
+            setChartData(null); // Clear data on error
+        } finally {
+            setLoadingChart(false); // Stop chart loading
+        }
+    };
+
+    // --- Prepare Chart Data for Rendering ---
+    const prepareChartData = (playlistStats, standStats, standName) => {
+        if (!playlistStats || !standStats) return null;
+
+        // Ensure data arrays have the correct length (6 points)
+        const safePlaylistStats = playlistStats.slice(0, 6);
+        const safeStandStats = standStats.slice(0, 6);
+
+        // Ensure stats are numbers, default to 0 if not (shouldn't happen with backend validation)
+        const numericPlaylistStats = safePlaylistStats.map(s => typeof s === 'number' ? s : 0);
+        const numericStandStats = safeStandStats.map(s => typeof s === 'number' ? s : 0);
+
+
+        return {
+            labels: chartLabels,
+            datasets: [
+                {
+                    label: 'Your Playlist',
+                    data: numericPlaylistStats,
+                    backgroundColor: 'rgba(29, 185, 84, 0.4)', // Spotify green, semi-transparent
+                    borderColor: '#1DB954',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#1DB954',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#1DB954'
+                },
+                {
+                    label: standName || 'Matched Stand',
+                    data: numericStandStats,
+                    backgroundColor: 'rgba(255, 99, 132, 0.4)', // Example color, semi-transparent
+                    borderColor: 'rgb(255, 99, 132)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgb(255, 99, 132)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(255, 99, 132)'
+                },
+            ],
+        };
+    };
+
+    // Get the data for the chart components
+    const combinedChartConfig = chartData ? prepareChartData(
+        chartData.playlist_stats_normalized,
+        // Extract stand stats from the stand object (PWR, SPD, PRC, DEV, STM, RNG)
+        // Make sure the order matches chartLabels: Power, Speed, Precision, Potential, Durability, Range
+        chartData.matched_stand ? [
+            chartData.matched_stand.PWR, // Power
+            chartData.matched_stand.SPD, // Speed
+            chartData.matched_stand.PRC, // Precision
+            chartData.matched_stand.DEV, // Potential (Development Potential)
+            chartData.matched_stand.STM, // Durability (Staying/Stamina)
+            chartData.matched_stand.RNG  // Range
+        ] : [], // Provide empty array if stand data is missing
+        chartData.matched_stand?.Stand // Use stand name for label
+    ) : null;
+
 
     // --- Render Logic ---
     return (
         <div className="App">
             <header className="App-header">
-                <h1>Spotify Playlist Analyzer</h1>
-                {/* Error display moved below header buttons for visibility */}
+                <h1>Jojofy Stand Analyzer</h1>
 
                 {!token ? ( /* ----- Login View ----- */
                     <div>
                         <h2>Welcome!</h2>
                         <p>Connect with your Spotify account to analyze your playlists.</p>
                         <button onClick={handleLogin}>Login to Spotify</button>
-                        {/* Display error prominently if login failed */}
                         {error && <p className="error-message">Login Error: {error}</p>}
                     </div>
                 ) : ( /* ----- Logged In Views ----- */
                     <div>
                         {/* --- Navigation Buttons --- */}
                         <div style={{ position: 'absolute', top: '20px', left: '20px', right: '20px', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
-                            {view !== 'playlists' ? (
-                                <button onClick={goBackToPlaylists}>
-                                    &larr; Back to Playlists
+                            {/* Show "Back" button unless on playlist view */}
+                            {view !== 'playlists' && (
+                                <button onClick={view === 'chart' ? goBackToMetrics : goBackToPlaylists}>
+                                    &larr; {view === 'chart' ? 'Back to Metrics' : 'Back to Playlists'}
                                 </button>
-                            ) : (
-                                <span>{/* Placeholder to keep logout button right */}</span>
+                            )}
+                            {/* Placeholder if on playlist view to keep logout right */}
+                            {view === 'playlists' && (
+                                <span></span>
                             )}
                             <button onClick={handleLogout}>Logout</button>
                         </div>
 
                         {/* --- Error Display Area (below nav) --- */}
-                        {error && (
-                            <div style={{ marginTop: '70px' }}> {/* Add margin to clear buttons */}
-                                <p className="error-message">Error: {error}</p>
+                        {/* Display general error OR chart error, prioritize chart error if it exists */}
+                        {(error || chartError) && (
+                            <div style={{ marginTop: '70px' }}>
+                                <p className="error-message">Error: {chartError || error}</p>
                             </div>
                         )}
 
@@ -602,18 +810,54 @@ function App() {
                                                             <div className="song-info">
                                                                 <strong>{item.name}</strong> by {item.artist} {item.mbid === 'Not found' ? <span style={{ fontSize: '0.8em', color: '#aaa' }}>(MBID not found)</span> : ''}
                                                             </div>
-                                                            <div className="song-data">
-                                                                <span>BPM: {item.bpm !== null ? item.bpm.toFixed(0) : 'N/A'}</span>
-                                                                <span>Dance: {item.danceability !== null ? item.danceability.toFixed(2) : 'N/A'}</span>
-                                                                <span>Genre: {item.genre || 'N/A'}</span>
-                                                                {/* Optionally display relaxed probability if needed */}
-                                                                {/* <span>Relaxed: {item.relaxedProbability !== null ? item.relaxedProbability.toFixed(2) : 'N/A'}</span> */}
-                                                            </div>
+                                                            {/* Optional: Display individual song data if needed */}
+                                                            {/* <div className="song-data">
+                                                                <span>BPM: {item.bpm ?? 'N/A'}</span>
+                                                                <span>Dance: {item.danceability ?? 'N/A'}</span>
+                                                                <span>Genre: {item.genre ?? 'N/A'}</span>
+                                                                <span>Relaxed: {item.relaxedProbability ?? 'N/A'}</span>
+                                                            </div> */}
                                                         </li>
                                                     ))}
                                                 </ul>
                                             )}
                                 </div>
+
+                                {/* Generate Chart Button */}
+                                <div>
+                                    <button
+                                        onClick={goToChartPage}
+                                        style={{ marginTop: 50, padding: '15px 40px', fontSize: '1.2em' }}
+                                        disabled={loadingData || loadingChart} // Disable if data is loading OR chart is generating
+                                    >
+                                        {loadingChart ? "Generating Chart..." : "Generate Chart!"}
+                                    </button>
+                                </div>
+
+                            </div>
+                        )}
+
+                        {/* ----- NEW: Chart Display View ----- */}
+                        {view === 'chart' && selectedPlaylist && (
+                            <div className="chart-view-container" style={{ marginTop: '80px', width: '90%', maxWidth: '800px' }}>
+                                <h2>{selectedPlaylist.name} - Stand Analysis</h2>
+                                {loadingChart && <p className="loading">Loading chart data...</p>}
+                                {/* Display chart error specifically */}
+                                {chartError && !loadingChart && <p className="error-message">Chart Error: {chartError}</p>}
+
+                                {combinedChartConfig && !loadingChart && !chartError && (
+                                    <div className="chart-wrapper">
+                                        <h3>Your Playlist vs. Matched Stand: {chartData?.matched_stand?.Stand || 'Unknown'}</h3>
+                                        <p>Your playlist's stats most closely resemble the Stand: <strong>{chartData?.matched_stand?.Stand || 'Unknown'}</strong>!</p>
+                                        <div style={{ position: 'relative', height: '50vh', minHeight: '300px', width: '100%' }}> {/* Container for responsiveness */}
+                                            <Radar data={combinedChartConfig} options={chartOptions} />
+                                        </div>
+                                        {/* Optionally display raw stand stats */}
+                                        {/* <pre style={{textAlign: 'left', background: '#333', padding: '10px', borderRadius: '5px', marginTop: '20px', fontSize: '0.8em', overflowX: 'auto'}}>
+                                            Matched Stand Raw Data: {JSON.stringify(chartData.matched_stand, null, 2)}
+                                         </pre> */}
+                                    </div>
+                                )}
                             </div>
                         )}
 

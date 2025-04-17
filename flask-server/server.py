@@ -6,18 +6,40 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 import os
 import sys
 import requests
-# Remove direct import of musicbrainz, use the function within the route
 import uuid
-import acousticbrainz  # Import the updated acousticbrainz module
+import acousticbrainz
+import jojo
+import json
+import numpy as np
+import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "spotify_playlist_app_secret_key"
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+app.secret_key = os.getenv("SECRET_KEY", "default_fallback_secret_key_if_not_set")
 
-# --- Spotify API Details and OAuth Setup (Keep as is) ---
-CLIENT_ID = "3a08fc29a9c545baa9363c2eb073e789"
-CLIENT_SECRET = "6e4c33b8e49b40578dd95bcbd0a34129"
-REDIRECT_URI = "http://localhost:5000/callback"
+# Get Frontend URL from environment variable for CORS
+FRONTEND_URL_FOR_CORS = os.getenv("FRONTEND_URL")
+# Define allowed origins
+allowed_origins = ["http://localhost:3000"] # Always allow localhost for development
+if FRONTEND_URL_FOR_CORS:
+    allowed_origins.append(FRONTEND_URL_FOR_CORS) # Add deployed frontend URL if set
+
+CORS(app, origins=allowed_origins, supports_credentials=True)
+
+# --- Spotify API Details and OAuth Setup ---
+CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
+
+if not CLIENT_ID or not CLIENT_SECRET:
+    print("Error: SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET must be set in the environment.", file=sys.stderr)
+    sys.exit(1) # Exit if credentials aren't found
+
+# Use environment variables for deployment URLs
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000") # Default for local dev
+REDIRECT_URI = f"{BACKEND_URL}/callback" # Construct dynamically
+
 SCOPES = [
     "playlist-read-private",
     "playlist-read-collaborative",
@@ -46,7 +68,7 @@ sp_oauth = SpotifyOAuth(
 @app.route('/')
 def login():
     auth_url = sp_oauth.get_authorize_url()
-    return jsonify({'auth_url': auth_url})
+    return redirect(auth_url)
 
 @app.route("/callback")
 def callback():
@@ -57,12 +79,25 @@ def callback():
         token_info = sp_oauth.get_access_token(code, check_cache=False) # Force fetch, don't rely on potentially wrong cache
         session["token_info"] = token_info
         access_token = token_info["access_token"]
-        # Redirect to frontend with token
-        return redirect(f"http://localhost:3000/?token={access_token}")
+
+        # Use environment variable for the frontend URL, crucial for deployment
+        frontend_url = os.getenv("FRONTEND_URL")
+        if not frontend_url:
+            print("Error: FRONTEND_URL environment variable not set.", file=sys.stderr)
+            # Fallback or error handling - here we'll default to localhost for dev, but log error
+            frontend_url = "http://localhost:3000"
+            # In a real production scenario, you might want to return an error page instead.
+
+        return redirect(f"{frontend_url}/?token={access_token}")
     except Exception as e:
         print(f"Error getting token: {e}", file=sys.stderr)
-        # Redirect to frontend with error indicator
-        return redirect("http://localhost:3000/?error=auth_failed")
+        # Use environment variable for the frontend URL on error too
+        frontend_url = os.getenv("FRONTEND_URL")
+        if not frontend_url:
+            print("Error: FRONTEND_URL environment variable not set.", file=sys.stderr)
+            frontend_url = "http://localhost:3000" # Fallback for dev
+
+        return redirect(f"{frontend_url}/?error=auth_failed")
 
 
 def get_valid_token():
@@ -314,6 +349,59 @@ def get_acoustic_data():
     except Exception as e:
         print(f"Error fetching acoustic data for MBID {mbid}: {str(e)}", file=sys.stderr)
         return jsonify({"error": f"Server error fetching acoustic data: {str(e)}"}), 500
+
+@app.route("/get_chart", methods=["GET"])
+def get_chart():
+    data_str = request.args.get("data")
+    if not data_str:
+        return jsonify({"error": "Please provide playlist metrics data"}), 400
+
+    try:
+        # Parse the JSON string received from the frontend
+        playlist_metrics = json.loads(data_str)
+        print(f"Received metrics for chart generation: {playlist_metrics}", file=sys.stdout) # Log received data
+
+        # --- Data Validation ---
+        required_keys = [
+            "averageBPM", "averageDanceability", "uniqueGenreCount",
+            "spotifyTotalDurationMs", "averageRelaxedProbability", "potential"
+        ]
+        # Check if all required keys are present and have non-null values
+        missing_or_null_keys = [
+            key for key in required_keys
+            if key not in playlist_metrics or playlist_metrics[key] is None
+        ]
+
+        if missing_or_null_keys:
+             error_message = f"Missing or null required metric(s) for chart generation: {', '.join(missing_or_null_keys)}"
+             print(error_message, file=sys.stderr)
+             return jsonify({"error": error_message}), 400
+
+        # --- Call jojo.py ---
+        converted_stats, stand_data = jojo.get_jojo_chart(playlist_metrics)
+
+        # --- Prepare Response ---
+        # Ensure numpy arrays/types are converted to standard Python types for JSON serialization
+        response_data = {
+            "playlist_stats_normalized": converted_stats.tolist() if isinstance(converted_stats, np.ndarray) else converted_stats,
+            "matched_stand": stand_data.to_dict() if hasattr(stand_data, 'to_dict') else stand_data # Assuming stand_data is a Pandas Series/DataFrame row
+        }
+
+        print(f"Sending chart data: {response_data}", file=sys.stdout) # Log response data
+        return jsonify(response_data)
+
+    except json.JSONDecodeError:
+        print(f"Error decoding JSON data: {data_str}", file=sys.stderr)
+        return jsonify({"error": "Invalid JSON format in data parameter"}), 400
+    except KeyError as e:
+        print(f"Missing key in input data for jojo function: {e}", file=sys.stderr)
+        return jsonify({"error": f"Missing expected metric in input data: {e}"}), 400
+    except Exception as e:
+        print(f"Error in get_chart: {str(e)}", file=sys.stderr)
+        # Log the full traceback for debugging if possible
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return jsonify({"error": f"Failed to generate chart: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
